@@ -38,49 +38,22 @@ def get_args():
     parser.add_argument('--img_format', type=str, default='RGB', help="The color format for training.")
     return parser.parse_args()
 
-icount = 0
-
-def arr2img(array):
-	img11 = np.transpose(array, (2, 0, 1)) #[128, 128, 11]
-
-def save_Imgs(tensor):
-	#print(tensor[4])
-	global icount
-	labels = (tensor.data).cpu().numpy() # shape:[8,11,128,128]
-	args = get_args()
-	#print(labels.shape)
-	print(labels[0][1])
-	#imgR = transforms.ToPILImage()(labels[3]).convert('L')
-	#tmp = labels[3]
-	#out = np.zeros((128, 128))
-	#for i in range(128):
-	#	for j in range(128):
-	#		if tmp[i][j] > 0.5:
-	#			out[i][j] = 255
-	#			print(i, j)
-
-	#rest = Image.fromarray(np.uint8(out), 'L')
-	##print(out)
-	#rest.save('Yaa{}.png'.format(icount),'PNG')
-	
-	icount += 1
 
 def train():
 	args = get_args()
 	# tst = Test()
 	# load data
-	print('---------------------Start loading data!---------------------\n')
 	transformations = transforms.Compose([transforms.ToTensor()])
 
 	datas =  dLoader(args.img_size, args.input_path, args.labels_dir, args.labels_path, transformations)
 
 	data_loader = DataLoader(datas, batch_size = args.batch_size, 
 		shuffle = True, num_workers = 0, drop_last = True)
-	print('---------------------Finish loading data!---------------------\n')
+	print('---------------------Total data LOADED!---------------------\n')
 	model = Model.PM_Net()
 	if torch.cuda.is_available():
 		model = model.cuda()
-		# model.load_state_dict(torch.load(args.save_path + 'PM_Net_' + str(275) + 'D_checkpoint.pkl'))
+		model.load_state_dict(torch.load(args.save_path + 'PM_Net_' + str(25) + 'E_checkpoint.pkl'))
 
 	# loss function
 	#criterion = nn.L1Loss(size_average = False).cuda()
@@ -90,11 +63,10 @@ def train():
 	print('---------------------Start TRAINING!---------------------\n')
 	fw = open(args.save_path + 'loss.txt','a')
 	# tst = Test()
+	ts = time.time()
 	tt = time.time()
-
 	for epoch in range(args.max_epoch):
 		y = []
-		ts = time.time()
 		for it, data in enumerate(data_loader):
 			#========== farward
 			train_input, mask = data
@@ -109,22 +81,17 @@ def train():
 			#========== Backward
 			loss.backward()
 			optimizor.step()
-			
-			print('Training Phase: Epoch: [%2d][%2d/%2d]\tIteration Loss: %.5f  Batch time: %5f' %
-              (it, epoch, args.max_epoch, loss.data[0], time.time() - tt))
-			tt = time.time()
+			if it % 10 is 0:
+				print('Training Phase: [%2d][%2d/%2d]\tLoss: %.5f  Time: [%2.3f/%6.3f]' %
+				  (it, epoch, args.max_epoch, loss.data[0], time.time() - tt, time.time() - ts))
+				tt = time.time()
 			y.append(loss.data[0])
 			fw.write(str(loss.data[0]) + '\n')
 			# tst.run((train_out.data).cpu().numpy())
 			it += 1
-			# if it % 50 == 0:
-				# tst.run(train_out)
 
-		# x = np.linspace(0, 1, len(y))
-		# plt.close('all')
-		# plt.plot(x, y, 'r')
-		# plt.savefig(args.save_path + 'epoch_{}.png'.format(epoch))
-			# print(train_out.shape)
+
+
 		print 'Epoch {} finished! Time cost: {}s'.format(epoch, time.time() - ts)
 		if (1 + epoch) % 25 == 0:
 			torch.save(model.state_dict(),args.save_path + 'PM_Net_' + str(epoch + 1) + 'E_checkpoint.pkl')
