@@ -7,16 +7,16 @@ import numpy as np
 from PIL import Image
 from torch import autograd, nn
 from torchvision import transforms
-from torchvision.utils import make_grid
+from torchvision.utils import make_grid, save_image
 from torch.utils.data import DataLoader
 from Model import PM_Net
 from loader2 import dLoader
 
 class Test(object):
     def __init__(self):
-        self.model_path = '/home/yiqi.liu-2/hanchun.shen/PM_Net/data/results/PM_Net_250D_checkpoint.pkl'
+        self.model_path = '/home/yiqi.liu-2/hanchun.shen/PM_Net/data/results/PM_Net_150D_checkpoint.pkl'
         self.__main_dir = '/home/yiqi.liu-2/hanchun.shen/PM_Net/data/test/dsts/'
-        self.batch_size = 2
+        self.batch_size = 8
         self.__img_size = 128
         self.__loadPath = '/home/yiqi.liu-2/hanchun.shen/PM_Net/data/test/srcs/'
         self.__color = [[255, 255, 255],
@@ -41,7 +41,7 @@ class Test(object):
         for i in range(label.shape[0]):
             for j in range(label.shape[1]):
                 img[i, j, :] = self.__color[label[i, j]]
-        return np.uint8(img)
+        return np.transpose(img, (2, 0, 1)) # np.uint8(img)
 
     def __load(self):
         paths = [self.__loadPath + pi for pi in os.listdir(self.__loadPath)]
@@ -72,40 +72,32 @@ class Test(object):
             net = net.cuda()
         net.load_state_dict(torch.load(self.model_path))
         print 'Model loaded: %3fs' % (time.time() - ts)
-        tt = time.time()
 
 
+
+        print 'Batch size is: ', self.batch_size
+        print '-'*26
         for it, data in enumerate(src_data):  # every batch
+            tt = time.time()
             train_input = autograd.Variable(data.cuda())
             train_out = net(train_input)
 
-            datain = make_grid()
-
-
-            for ii, im in enumerate((train_out.data).cpu().numpy()):
+            labels = []
+            for ii, im in enumerate(train_out.data.cpu().numpy()):
                 im = np.array(im)
-                # print im.shape
                 labelimg = im.argmax(axis=0)
                 img = self.__label2img(labelimg)
-                rst = Image.fromarray(img)
-                rst.save(self.__save_path())
-                print 'Model test: [{}/{}]\t[time: {}]'.format(ii,it, time.time() - tt)
-                tt = time.time()
+                img = img/255
+                labels.append(img)
 
-
-        # for im in src:
-        #     im = np.array(im)
-        #     print im.shape
-        #     labelimg = im.argmax(axis=0)
-        #     img = self.__label2img(labelimg)
-        #     rst = Image.fromarray(img)
-        #     rst.save(self.__save_path())
+            labels = torch.FloatTensor(np.array(labels))
+            labels = torch.cat(((train_input.data).cpu(), labels), 0)
+            save_image(labels, self.__save_path(), nrow=self.batch_size)
+            print 'Test Batch: [{} / {}]\tTime: [{} / {}]'.format(it + 1, len(src_data), str(time.time() -tt)[:7], str(time.time() - ts)[:8])
 
 if __name__ == '__main__':
     t = time.time()
     test = Test()
     test.run()
-    print 'Whole time: ',time.time() - t
-
-
-
+    print '-' * 26
+    print 'Total time: ',str(time.time() - t)[:6]
